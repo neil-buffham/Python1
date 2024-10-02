@@ -1,7 +1,8 @@
+#Written by Neil Buffham
 # Test values for cementign formatting style/method:
-'''
-name1 = "Fred"
-name2 = "Weasley"
+
+name1 = "fred"
+name2 = "weasley"
 email = "fredweasley@byui.edu"
 phone = "123-456-7890"
 title = "Bee watch-watcher"
@@ -10,8 +11,8 @@ hair = "Blonde"
 eyes = "Blue"
 month = "September"
 train = "No"
-'''
 
+'''
 #Begin of functional code
 print("Please enter the following information:")
 print()
@@ -27,14 +28,14 @@ hair = input("What is your hair color?")
 eyes = input("What is your eye color?")
 month = input("What month do/did you start?")
 train = input("Are you in training?")
-
+'''
 
 print()
 print("The ID Card is:")
 
 #Main portion of the ID card
 print("-"*40)
-print(name1,name2)
+print(name2.capitalize() + ", " + name1.capitalize())
 print(title)
 print("ID: " + idn)
 print()
