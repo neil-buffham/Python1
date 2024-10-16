@@ -2,24 +2,27 @@ import os
 import shutil
 import csv
 import time
-start_time = time.time() # Record the start time before processing
+start_time = time.time()  # Record the start time before processing
 from PIL import Image
 
-def detect_border(image):
+def is_tight_yellow(r, g, b):
+    """Check if the given RGB values match the tight definition of yellow."""
+    return (140 <= r <= 255) and (170 <= g <= 210) and (45 <= b <= 100)
+
+def second_scan(image, initial_border_height):
     """
-    Detects the height of a black and yellow border at the bottom of the image.
-    Returns a tuple indicating whether a border is detected, the height of the detected border,
-    and the count of valid border rows.
+    Perform a second scan on the image to refine the border detection.
+    The scan starts halfway up the detected border or 8 pixels, whichever is less.
     """
     width, height = image.size
-    border_height = 0
-    valid_border_rows = 0
-    yellow_found = False
-
-    for y in range(height - 1, -1, -1):  # Start from the bottom of the image
+    refined_border_height = 0
+    start_y = height - min(initial_border_height // 2, 8)
+    
+    for y in range(height - 1, start_y - 1, -1):
         row_black_count = 0
         row_yellow_count = 0
-        
+        total_pixels = width
+
         for x in range(width):
             pixel = image.getpixel((x, y))
             if len(pixel) == 3:  # RGB
@@ -28,30 +31,22 @@ def detect_border(image):
                 r, g, b, a = pixel  # Ignore alpha
             else:
                 continue  # Skip unexpected formats
-            
+
             if r < 50 and g < 50 and b < 50:  # Black pixel
                 row_black_count += 1
-            elif r > 200 and g > 200 and b < 100:  # Yellow pixel
+            elif is_tight_yellow(r, g, b):  # Tight yellow
                 row_yellow_count += 1
 
-        total_pixels = width
         black_percentage = row_black_count / total_pixels
         yellow_percentage = row_yellow_count / total_pixels
-        
-        # Check for border conditions
-        if (black_percentage >= 0.75 and black_percentage <= 0.97) or (black_percentage >= 0.50 and yellow_percentage > 0):
-            border_height += 1
-            valid_border_rows += 1
-            if yellow_percentage > 0:
-                yellow_found = True
-        elif black_percentage > 0.97 and yellow_found:
-            break  # Stop if we hit a non-border row
 
-    # Ensure at least 3 valid border rows for it to count as a border
-    if valid_border_rows >= 3:
-        return True, border_height + 1  # Return increased border height
-    else:
-        return False, 0  # Not a valid border
+        # Must have 95% black or tight yellow, and yellow can't exceed 45%
+        if black_percentage + yellow_percentage >= 0.95 and yellow_percentage <= 0.45:
+            refined_border_height += 1
+        else:
+            break
+
+    return refined_border_height + 1  # Add one more line
 
 # Input and output folder paths
 input_folder = r'C:\memes\crop-source'
@@ -61,14 +56,15 @@ crop_none_folder = r'C:\memes\crop-none'
 crop_none_vids_folder = r'C:\memes\crop-none-vids'
 crop_not_compatible_folder = r'C:\memes\crop-not-compatible'
 crop_readme_folder = r'C:\memes\crop-readme'
+crop_tall_folder = r'C:\memes\crop-tall'
+crop_tall_off_folder = r'C:\memes\crop-tall-off'
+crop_fail1_folder = r'C:\memes\crop-fail1'
 
 # Ensure all output folders exist
-os.makedirs(output_folder, exist_ok=True)
-os.makedirs(crop_off_folder, exist_ok=True)
-os.makedirs(crop_none_folder, exist_ok=True)
-os.makedirs(crop_none_vids_folder, exist_ok=True)
-os.makedirs(crop_not_compatible_folder, exist_ok=True)
-os.makedirs(crop_readme_folder, exist_ok=True)
+for folder in [output_folder, crop_off_folder, crop_none_folder, crop_none_vids_folder, 
+               crop_not_compatible_folder, crop_readme_folder, crop_tall_folder, 
+               crop_tall_off_folder, crop_fail1_folder]:
+    os.makedirs(folder, exist_ok=True)
 
 # Initialize counters and storage for CSV
 total_files_processed = 0
@@ -94,21 +90,35 @@ for filename in os.listdir(input_folder):
     if is_image:
         try:
             image = Image.open(file_path)
-            border_detected, border_height = detect_border(image)
+            border_detected, initial_border_height = detect_border(image)
 
             if border_detected:
-                # Print output with filename truncation
-                truncated_filename = f"{filename[:15]}...{filename[-10:]}" if len(filename) > 25 else filename
-                print(f"{truncated_filename:<30} {'y':<6} {'y':<15} {border_height:<15} {'crop-output':<15} {'':<15}")
-                total_images_cropped += 1
+                # Second scan for refining the border
+                final_border_height = second_scan(image, initial_border_height)
+                
+                # Add one more line of pixels
+                final_border_height += 1
 
-                # Crop and save images (removing one additional line of pixels)
-                cropped_image = image.crop((0, 0, image.width, image.height - border_height))
-                cropped_image.save(os.path.join(output_folder, filename))
+                # Determine the output folder based on final border height
+                if final_border_height > 25:
+                    output_dest = crop_tall_folder
+                    off_dest = crop_tall_off_folder
+                else:
+                    output_dest = output_folder
+                    off_dest = crop_off_folder
+
+                # Crop and save images
+                cropped_image = image.crop((0, 0, image.width, image.height - final_border_height))
+                cropped_image.save(os.path.join(output_dest, filename))
 
                 # Save the cropped-off portion
-                cropped_off_image = image.crop((0, image.height - border_height, image.width, image.height))
-                cropped_off_image.save(os.path.join(crop_off_folder, filename))
+                cropped_off_image = image.crop((0, image.height - final_border_height, image.width, image.height))
+                cropped_off_image.save(os.path.join(off_dest, filename))
+
+                # Print and log results
+                truncated_filename = f"{filename[:15]}...{filename[-10:]}" if len(filename) > 25 else filename
+                print(f"{truncated_filename:<30} {'y':<6} {'y':<15} {final_border_height:<15} {output_dest:<15} {'':<15}")
+                total_images_cropped += 1
 
             else:
                 truncated_filename = f"{filename[:15]}...{filename[-10:]}" if len(filename) > 25 else filename
@@ -116,7 +126,10 @@ for filename in os.listdir(input_folder):
                 total_images_not_cropped += 1
                 shutil.copy(file_path, os.path.join(crop_none_folder, filename))
 
-            csv_data.append([filename, 'y', 'y' if border_detected else 'n', border_height if border_detected else 'n/a', 'crop-output' if border_detected else 'crop-none', error_message])
+            csv_data.append([filename, 'y', 'y' if border_detected else 'n', 
+                             final_border_height if border_detected else 'n/a', 
+                             output_dest if border_detected else 'crop-none', 
+                             error_message])
 
         except Exception as e:
             error_message = str(e)
@@ -166,7 +179,5 @@ with open(csv_file_path, mode='w', newline='') as csv_file:
 print(f"CSV report generated at: {csv_file_path}")
 
 '''
-This version seems to work correctly, formatting the live view well, handling the alpha in .png's R G B A arrangement, and exporting the csv 
-nicely without truncating the file names in said csv. 
-However, it only works well for pictures with lighter backgrounds. The
-code detecting borders needs to be updated.'''
+allegedly detect_border is not defined, and it causes all the pictures 
+to not crop and end up in the not compatible folder.'''
