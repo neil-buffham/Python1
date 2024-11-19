@@ -18,20 +18,24 @@ words = [
 ]
 
 
-word = random.choice(words)
+
 running = True
-playing = True
-letter_count = len(word)
+
 
 # Intro portion: ---------------------------------------------------------------------------------------------------------------
-print("Welcome to the word guessing game!")
-hint = (letter_count * "_ ")
-print (f" Hint: {hint}")
+
 
     # Guessing portion: ------------------------------------------------------------------------------------------------------------
 while running:
+    word = random.choice(words)
     tries = 0
+    playing = True
+    letter_count = len(word)
+    print("Welcome to the word guessing game!")
+    hint_initial = (letter_count * "_ ")
+    print (f" Hint: ({letter_count} chars): {hint_initial}")
     while playing:
+
         guess = str.lower(input("What is your guess? "))  #Get user input
         
         
@@ -55,7 +59,8 @@ while running:
         #if the word wasn't correct, begin analyzing letters
         elif guess != word:
             # Check if each letter matches first the letter in the same position in the guess, then in the word at all
-            print("Your hint is: ", end="")  # Start printing on the same line
+            hint_partial = f"Your hint is: ({letter_count} chars): "
+            print(hint_partial, end="")  # Start printing on the same line
             for position, guess_letter in enumerate(guess):
                 if guess_letter == word[position]:
                     print(f"{str.upper(guess_letter)}", end=" ")  # Correct letter in the correct position
@@ -68,10 +73,16 @@ while running:
                         
 
     play_again = str.lower(input("Would you like to play again? (Yes/No)"))
+    analyzing_play_again = True
 
-    if play_again == "yes":
-        playing = True
-    elif play_again == "no":
-        print("Thank you for playing")
-        running = False
-        playing = False
+    while analyzing_play_again:
+        if play_again == "yes":
+            playing = True
+            analyzing_play_again = False
+        elif play_again == "no":
+            print("Thank you for playing")
+            analyzing_play_again = False
+            running = False
+            playing = False
+        else:
+            play_again = str.lower(input("Would you like to play again? (Yes/No)"))
