@@ -1,0 +1,21 @@
+running = True
+lowest = 1000
+highest = 0
+
+with open('w11/life-expectancy.csv') as life_data:
+
+    #while running:
+    line_counter = 1
+    for line in life_data:
+        output = line.strip()
+        output = output.split(',')
+        if line_counter > 1:
+            age_val = float(output[3])
+            #Getting Least and Greatest Values
+            if lowest > age_val:
+                lowest = age_val
+            if highest < age_val:
+                highest = age_val
+        line_counter +=1
+    print(f'Lowest: {lowest}, Highest: {highest}')
+        
